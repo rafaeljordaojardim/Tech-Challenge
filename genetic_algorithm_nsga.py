@@ -1,6 +1,9 @@
+!pip install deap
+import copy
 import numpy as np
 import pandas as pd
 import random
+import matplotlib.pyplot as plt
 from deap import base, creator, tools, algorithms
 
 # === Dados ===
@@ -61,7 +64,21 @@ toolbox.register("mate", tools.cxSimulatedBinaryBounded, low=0.0, up=1.0, eta=20
 toolbox.register("mutate", tools.mutPolynomialBounded, low=0.0, up=1.0, eta=20.0, indpb=0.2)
 toolbox.register("select", tools.selNSGA2)
 
-# === Execução NSGA-II ===
+# === Mutação ===
+print("\n🔧 Exemplo de Mutação em 2 indivíduos:")
+for i in range(2):
+    ind = criar_individuo_diversificado()
+    print(f"\n🎯 Indivíduo original {i+1}:")
+    print(np.round(get_weights(ind) * 100, 2))
+
+    ind_mutado = copy.deepcopy(ind)
+    toolbox.mutate(ind_mutado)
+    ind_mutado[:] = get_weights(ind_mutado)
+
+    print(f"✨ Indivíduo mutado {i+1}:")
+    print(np.round(get_weights(ind_mutado) * 100, 2))
+
+# === Execução do NSGA-II ===
 pop = toolbox.populacao(n=POP_SIZE)
 hof = tools.ParetoFront()
 
@@ -70,6 +87,20 @@ pop, logbook = algorithms.eaMuPlusLambda(
     cxpb=0.7, mutpb=0.3, ngen=N_GEN,
     halloffame=hof, verbose=True
 )
+
+#Gráfico Retorno vs Risco
+# Extrai os objetivos: retorno e risco
+retornos = [ind.fitness.values[0] for ind in hof]
+riscos = [ind.fitness.values[1] for ind in hof]
+
+plt.figure(figsize=(8, 6))
+plt.scatter(riscos, retornos, c='blue', label='Fronte de Pareto')
+plt.xlabel('Risco (Desvio Padrão)')
+plt.ylabel('Retorno Esperado')
+plt.title('Fronte de Pareto - Portfólios Ótimos')
+plt.legend()
+plt.grid(True)
+plt.show()
 
 # Função para converter a população em uma tabela
 def popula_para_tabela(populacao):
@@ -89,17 +120,16 @@ def popula_para_tabela(populacao):
 
         registros.append(registro)
 
-    df = pd.DataFrame(registros)
-    return df
+    return pd.DataFrame(registros)
 
 # Exibir resultados de forma mais detalhada
 def show_result(ind, titulo="Resultado"):
     weights = np.array(ind)
     weights /= weights.sum()
 
-    retorno = calcular_retorno(weights) * 100 
-    risco = calcular_risco(weights) * 100     
-    diversificacao = calcular_diversificacao(weights) * 100 
+    retorno = calcular_retorno(weights) * 100
+    risco = calcular_risco(weights) * 100
+    diversificacao = calcular_diversificacao(weights) * 100
 
     df = pd.DataFrame({
         "Ticker": tickers,
