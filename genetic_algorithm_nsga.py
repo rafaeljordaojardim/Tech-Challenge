@@ -64,7 +64,25 @@ toolbox.register("mate", tools.cxSimulatedBinaryBounded, low=0.0, up=1.0, eta=20
 toolbox.register("mutate", tools.mutPolynomialBounded, low=0.0, up=1.0, eta=20.0, indpb=0.2)
 toolbox.register("select", tools.selNSGA2)
 
-# === Mutação ===
+# === Criar população inicial e avaliar ===
+pop = toolbox.populacao(n=POP_SIZE)
+for ind in pop:
+    ind.fitness.values = toolbox.evaluate(ind)
+
+# Gráfico: População inicial - Retorno vs Risco
+retornos_pop = [-ind.fitness.values[0] for ind in pop]
+riscos_pop = [ind.fitness.values[1] for ind in pop]
+
+plt.figure(figsize=(8,6))
+plt.scatter(riscos_pop, retornos_pop, c='orange', label='População Inicial')
+plt.xlabel('Risco (Desvio Padrão)')
+plt.ylabel('Retorno Esperado')
+plt.title('População Inicial - Retorno vs Risco')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+# === Exemplo de Mutação ===
 print("\n🔧 Exemplo de Mutação em 2 indivíduos:")
 for i in range(2):
     ind = criar_individuo_diversificado()
@@ -78,8 +96,31 @@ for i in range(2):
     print(f"✨ Indivíduo mutado {i+1}:")
     print(np.round(get_weights(ind_mutado) * 100, 2))
 
+# Gráfico: Depois da mutação - Retorno vs Risco dos dois indivíduos mutados
+retornos_mutados = []
+riscos_mutados = []
+
+for i in range(2):
+    # Criar e mutar indivíduo
+    ind = criar_individuo_diversificado()
+    ind_mutado = copy.deepcopy(ind)
+    toolbox.mutate(ind_mutado)
+    ind_mutado[:] = get_weights(ind_mutado)
+
+    fit_vals = toolbox.evaluate(ind_mutado)
+    retornos_mutados.append(-fit_vals[0])
+    riscos_mutados.append(fit_vals[1])
+
+plt.figure(figsize=(8,6))
+plt.scatter(riscos_mutados, retornos_mutados, c='green', label='Indivíduos Mutados')
+plt.xlabel('Risco (Desvio Padrão)')
+plt.ylabel('Retorno Esperado')
+plt.title('Indivíduos Após Mutação - Retorno vs Risco')
+plt.legend()
+plt.grid(True)
+plt.show()
+
 # === Execução do NSGA-II ===
-pop = toolbox.populacao(n=POP_SIZE)
 hof = tools.ParetoFront()
 
 pop, logbook = algorithms.eaMuPlusLambda(
@@ -88,16 +129,15 @@ pop, logbook = algorithms.eaMuPlusLambda(
     halloffame=hof, verbose=True
 )
 
-#Gráfico Retorno vs Risco
-# Extrai os objetivos: retorno e risco
-retornos = [ind.fitness.values[0] for ind in hof]
-riscos = [ind.fitness.values[1] for ind in hof]
+# Gráfico Fronteira de Pareto final
+retornos_hof = [-ind.fitness.values[0] for ind in hof]
+riscos_hof = [ind.fitness.values[1] for ind in hof]
 
 plt.figure(figsize=(8, 6))
-plt.scatter(riscos, retornos, c='blue', label='Fronte de Pareto')
+plt.scatter(riscos_hof, retornos_hof, c='blue', label='Fronteira de Pareto')
 plt.xlabel('Risco (Desvio Padrão)')
 plt.ylabel('Retorno Esperado')
-plt.title('Fronte de Pareto - Portfólios Ótimos')
+plt.title('Fronteira de Pareto - Portfólios Ótimos')
 plt.legend()
 plt.grid(True)
 plt.show()
