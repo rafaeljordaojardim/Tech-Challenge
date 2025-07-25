@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import random
 import math
+import matplotlib.pyplot as plt
 
 # === Configuração do AG ===
 N_IND = 100
@@ -14,6 +15,12 @@ NUM_GENERATION_COUNTER = 1
 ELITE = 1
 max_fitness = -np.inf
 
+# Para gráficos
+historico_melhor_fitness = []
+historico_fitness_medio = []
+historico_risco = []
+historico_retorno = []
+
 np.random.seed(42)
 random.seed(42)
 
@@ -25,7 +32,6 @@ risco = dados["Risco_Anual"].values
 
 # Carregar matriz de covariância
 cov_matrix = pd.read_csv("fiis_cov_matrix.csv", index_col=0)
-# Reordenar para garantir alinhamento correto
 cov_matrix = cov_matrix.loc[tickers, tickers]
 cov_matrix_values = cov_matrix.values
 
@@ -48,37 +54,26 @@ def get_weights(item):
     weights = weights / weights.sum()
     return weights
 
-ALPHA = 0.6  # peso do retorno
-BETA = 0.2   # peso do risco
-GAMMA = 0.2  # peso da diversificação
+ALPHA = 0.6
+BETA = 0.2
+GAMMA = 0.2
 
-# === Função de fitness ===
 def fitness(item):
     weights = get_weights(item)
-
     retorno = calcular_retorno(weights)
     risco = calcular_risco(weights)
     diversificacao = calcular_diversificacao(weights)
-
     retorno_norm = retorno
     risco_norm = risco
     diversificacao_norm = diversificacao / np.log(len(weights))
-
-    score = (
-        ALPHA * retorno_norm
-        - BETA * risco_norm
-        + GAMMA * diversificacao_norm
-    )
-
+    score = ALPHA * retorno_norm - BETA * risco_norm + GAMMA * diversificacao_norm
     return max(score, 1e-6)
 
-# Normalizar indivíduo para garantir peso mínimo em cada ativo
 def normalizar_com_minimo(ind, minimo=0.02):
     ind = np.maximum(ind, minimo)
     ind /= ind.sum()
     return ind
 
-# === Criação e mutação ===
 def criar_individuo():
     ind = np.random.rand(len(tickers))
     ind = normalizar_com_minimo(ind)
@@ -104,8 +99,8 @@ def mutacao_com_parametros(ind, taxa_mut, amp_mut):
 # === Execução principal ===
 pop = [criar_individuo() for _ in range(N_IND)]
 best_result_first_generation = None
+
 while True:
-    # Ajustar taxa e amplitude de mutação se o fitness não melhorar por muito tempo
     if N_GEN_WITHOUT_IMPROVE_FITNESS > 20:
         taxa_mut = 0.5
         amp_mut = 0.3
@@ -117,14 +112,12 @@ while True:
     elite_indices = np.argsort(fitnesses)[-ELITE:]
     elite = [pop[i] for i in elite_indices]
 
-    # Substituir piores indivíduos a cada 10 gerações para diversificação
     if NUM_GENERATION_COUNTER % 10 == 0:
         n_substituir = math.ceil(N_IND * 0.1)
         indices_piores = np.argsort(fitnesses)[:n_substituir]
         for i in indices_piores:
             pop[i] = criar_individuo()
 
-    # Construir nova população com elitismo + crossover + mutação
     nova_pop = elite[:]
     while len(nova_pop) < N_IND:
         pais = random.choices(pop, weights=fitnesses, k=2)
@@ -134,10 +127,16 @@ while True:
         nova_pop.extend([filho1, filho2])
 
     pop = nova_pop[:N_IND]
-
     melhor_idx = np.argmax(fitnesses)
     best = pop[melhor_idx]
     best_fitness = fitnesses[melhor_idx]
+
+    # ⏺️ Armazenar histórico para gráficos
+    media_fitness = np.mean(fitnesses)
+    historico_melhor_fitness.append(best_fitness)
+    historico_fitness_medio.append(media_fitness)
+    historico_retorno.append(calcular_retorno(best))
+    historico_risco.append(calcular_risco(best))
 
     if best_fitness > max_fitness:
         N_GEN_WITHOUT_IMPROVE_FITNESS = 0
@@ -153,11 +152,38 @@ while True:
     risco_real = np.sqrt(best @ cov_matrix_values @ best.T)
     diversificacao = calcular_diversificacao(best)
     div_norm = diversificacao / np.log(len(best))
-    if (NUM_GENERATION_COUNTER == 1) and (best_result_first_generation == None):
+    if (NUM_GENERATION_COUNTER == 1) and (best_result_first_generation is None):
         best_result_first_generation = best
     print(f"Geração {NUM_GENERATION_COUNTER}: Fitness = {best_fitness:.6f}, Retorno = {retorno_esperado:.6f}, Risco = {risco_real:.6f}, Diversificação = {div_norm:.4f}")
     NUM_GENERATION_COUNTER += 1
 
+print("\n")
+
+# === GRÁFICO 1: Evolução do Fitness ===
+plt.figure(figsize=(10, 5))
+plt.plot(historico_melhor_fitness, label="Melhor Fitness", marker='o')
+plt.plot(historico_fitness_medio, label="Fitness Médio", linestyle='--', marker='x')
+plt.xlabel("Geração")
+plt.ylabel("Fitness")
+plt.title("Evolução do Fitness ao Longo das Gerações")
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+
+print("\n")
+# === GRÁFICO 2: Risco x Retorno (últimos indivíduos) ===
+plt.figure(figsize=(8, 6))
+plt.scatter(historico_risco, historico_retorno, c='blue', label='Evolução Portfólio')
+plt.xlabel('Risco (Desvio Padrão)')
+plt.ylabel('Retorno Esperado')
+plt.title('Evolução Risco x Retorno da Melhor Carteira')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+print("\n")
+# === Resultado Final ===
 def show_result(individuo, titulo="Resultado"):
     weights = get_weights(individuo)
     retorno_esperado = calcular_retorno(weights)
@@ -166,7 +192,6 @@ def show_result(individuo, titulo="Resultado"):
     diversificacao_norm = diversificacao / np.log(len(weights))
     fitness_final = fitness(individuo)
 
-    # Construir tabela
     df_resultado = pd.DataFrame({
         "Ticker": tickers,
         "Peso (%)": weights * 100
@@ -174,20 +199,12 @@ def show_result(individuo, titulo="Resultado"):
 
     print(f"\n📊 {titulo}")
     print(df_resultado.to_string(index=False, float_format="%.2f"))
-
-    # Mostrar métricas
     print("\n🔍 Métricas da Carteira:")
     print(f"Retorno esperado     : {retorno_esperado:.2%}")
     print(f"Risco esperado       : {risco_real:.2%}")
     print(f"Diversificação (norm): {diversificacao_norm:.4f}")
     print(f"Fitness final        : {fitness_final:.6f}")
 
-
-# === Resultado final ===
-print("Retornos:", retornos)
-print("Riscos:", risco)
-print("Tickers:", tickers)
-print("Número de FIIs:", len(tickers))
 print("======================================")
 show_result(best_result_first_generation, "Best result of first generation")
 print("======================================")
