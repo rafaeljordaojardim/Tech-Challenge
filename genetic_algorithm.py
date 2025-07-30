@@ -3,8 +3,46 @@ import numpy as np
 import random
 import math
 import matplotlib.pyplot as plt
+import yfinance as yf
+import seaborn as sns
 
-# === Configuração do AG ===
+
+# Atualiza e importa os dados - PESSOA 1
+
+# Lista de FIIs (com ".SA" para a B3 via yfinance)
+fiis = ["ALZR11.SA", "BTLG11.SA", "HGRU11.SA", "RBRP11.SA",
+        "RECR11.SA", "VGIP11.SA", "VISC11.SA", "VRTA11.SA", "XPLG11.SA"]
+
+# Período de 12 meses
+dados = yf.download(fiis, start="2024-07-01", end="2025-07-01", interval="1d")["Close"]
+print("Dados baixados com sucesso!")
+
+# Preenchendo valores faltantes com o último valor válido
+dados = dados.fillna(method='ffill')
+
+# Calculando retornos mensais
+retornos_mensais = dados.resample("ME").last().pct_change().dropna()
+
+# Calculando retorno e risco para cada FII
+resultado = pd.DataFrame(index=retornos_mensais.columns)
+resultado['Retorno_Medio_Anual'] = (1 + retornos_mensais.mean()) ** 12 - 1
+resultado['Risco_Anual'] = retornos_mensais.std() * np.sqrt(12)
+
+# Calculando matriz de covariância dos retornos mensais
+cov_matrix = retornos_mensais.cov()
+
+# Salvando os dados em CSVs
+resultado.to_csv("fiis_dados.csv", float_format="%.6f")
+cov_matrix.to_csv("fiis_cov_matrix.csv", float_format="%.8f")
+
+# Exibir resultado
+print(resultado.sort_values(by="Retorno_Medio_Anual", ascending=False))
+print("\nMatriz de Covariância salva em 'fiis_cov_matrix.csv'")
+
+print("\n")
+
+
+# === Configuração do AG
 N_IND = 100
 N_GEN_WITHOUT_IMPROVE_FITNESS = 0
 MAX_N_GEN_WITHOUT_IMPROVE_FITNESS = 1000
@@ -67,16 +105,11 @@ def fitness(item):
     risco_norm = risco
     diversificacao_norm = diversificacao / np.log(len(weights))
     score = ALPHA * retorno_norm - BETA * risco_norm + GAMMA * diversificacao_norm
-    return max(score, 1e-6)
-
-def normalizar_com_minimo(ind, minimo=0.02):
-    ind = np.maximum(ind, minimo)
-    ind /= ind.sum()
-    return ind
+    return score
 
 def criar_individuo():
     ind = np.random.rand(len(tickers))
-    ind = normalizar_com_minimo(ind)
+    ind /= ind.sum()
     return ind
 
 def crossover(p1, p2):
@@ -89,11 +122,14 @@ def crossover(p1, p2):
         return p1.copy(), p2.copy()
 
 def mutacao_com_parametros(ind, taxa_mut, amp_mut):
-    for i in range(len(ind)):
+    ind = ind.copy()
+    for _ in range(len(ind)):
         if random.random() < taxa_mut:
-            ind[i] += np.random.uniform(-amp_mut, amp_mut)
-    ind = np.clip(ind, 0, 1)
-    ind = normalizar_com_minimo(ind)
+            i, j = np.random.choice(len(ind), 2, replace=False)  # escolhe dois ativos diferentes
+            delta = np.random.uniform(0, amp_mut) * ind[i]  # fração do ativo i
+            ind[i] -= delta
+            ind[j] += delta
+    ind /= ind.sum()
     return ind
 
 # === Execução principal ===
@@ -144,9 +180,9 @@ while True:
     else:
         N_GEN_WITHOUT_IMPROVE_FITNESS += 1
         if N_GEN_WITHOUT_IMPROVE_FITNESS >= MAX_N_GEN_WITHOUT_IMPROVE_FITNESS:
-            print("🔚 Algoritmo parou por não melhorar o fitness.")
+            #print("🔚 Algoritmo parou por não melhorar o fitness.")
             break
-        print(f"Melhor fitness não melhorou: {best_fitness:.6f}")
+        #print(f"Melhor fitness não melhorou: {best_fitness:.6f}")
 
     retorno_esperado = np.dot(best, retornos)
     risco_real = np.sqrt(best @ cov_matrix_values @ best.T)
@@ -154,7 +190,7 @@ while True:
     div_norm = diversificacao / np.log(len(best))
     if (NUM_GENERATION_COUNTER == 1) and (best_result_first_generation is None):
         best_result_first_generation = best
-    print(f"Geração {NUM_GENERATION_COUNTER}: Fitness = {best_fitness:.6f}, Retorno = {retorno_esperado:.6f}, Risco = {risco_real:.6f}, Diversificação = {div_norm:.4f}")
+    #print(f"Geração {NUM_GENERATION_COUNTER}: Fitness = {best_fitness:.6f}, Retorno = {retorno_esperado:.6f}, Risco = {risco_real:.6f}, Diversificação = {div_norm:.4f}")
     NUM_GENERATION_COUNTER += 1
 
 print("\n")
@@ -209,4 +245,4 @@ print("======================================")
 show_result(best_result_first_generation, "Best result of first generation")
 print("======================================")
 best = max(pop, key=fitness)
-show_result(best, "Melhor Carteira Encontrada")
+show_result(best, f"Melhor Carteira Encontrada of {NUM_GENERATION_COUNTER} generation")
