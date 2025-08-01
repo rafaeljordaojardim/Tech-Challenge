@@ -1,44 +1,57 @@
 # 🧬 Otimização de Carteira de FIIs com Algoritmo Genético
 
-Este projeto utiliza **algoritmos genéticos (AG)** para encontrar a composição ideal de uma carteira de **Fundos Imobiliários (FIIs)** listados na B3, equilibrando **retorno esperado**, **risco (volatilidade)** e **diversificação**. 
+## 📌 Sobre o Projeto
 
-Dados históricos são coletados automaticamente via API do Yahoo Finance (`yfinance`), e os resultados são exibidos com gráficos e métricas financeiras.
+Este projeto foi desenvolvido para o Tech Challenge da pós-graduação e utiliza *Algoritmos Genéticos* para otimizar uma carteira de Fundos Imobiliários (FIIs) listados na B3.
 
----
+🎯 O objetivo é encontrar a alocação ideal que *equilibre retorno esperado, risco (volatilidade) e diversificação*. A solução automatiza a coleta de dados históricos e realiza testes evolutivos em milhares de combinações, buscando a mais eficiente.
 
-## 📈 Objetivo
+## ⚙️ Como Funciona
 
-> Encontrar a melhor combinação de FIIs para maximizar o retorno esperado, minimizar o risco e garantir boa diversificação.
+A aplicação se divide em duas etapas principais: coleta de dados e otimização.
 
----
+### 1️⃣ Coleta e Preparo dos Dados
 
-## ⚙️ Tecnologias e Bibliotecas
+- Utiliza a API do yfinance para buscar dados históricos dos FIIs.
+- Calcula o retorno esperado de cada fundo e a matriz de covariância entre eles.
+- Essas métricas são fundamentais para avaliar risco e retorno.
 
-- Python 3.x
-- `pandas`
-- `numpy`
-- `yfinance`
-- `matplotlib`
-- `seaborn`
-- `math`
-- `random`
+### 2️⃣ Otimização com Algoritmo Genético
 
----
+- O coração do projeto, onde acontece o processo evolutivo.
 
-## 🧪 Funcionalidades
+#### 🧠 Função de Aptidão (Fitness)
 
-- 📦 **Coleta automática** de dados históricos dos FIIs da B3 via `yfinance`.
-- 📊 Cálculo de **retorno médio anual** e **risco anualizado** (desvio padrão).
-- 🧠 Execução de um **algoritmo genético customizado**, com:
-  - Seleção por fitness
-  - Crossover
-  - Mutação adaptativa
-  - Elite preservation
-- 🔍 Avaliação do portfólio com função fitness baseada em:
-  - Retorno (α)
-  - Risco (β)
-  - Diversificação (γ via entropia)
-- 📈 Gráficos de:
-  - Evolução do fitness
-  - Relação risco x retorno da melhor carteira
-- 📋 Geração de CSVs para persistência dos dados (retornos e covariância)
+O algoritmo usa o *Índice de Sharpe* para medir a qualidade de cada carteira. Ele avalia o retorno ajustado pelo risco:
+
+$$
+S(x) = \frac{R(x) - R_f}{\sigma(x)}
+$$
+
+Onde:
+
+- $R(x)$ = retorno esperado da carteira  
+- $R_f$ = taxa livre de risco  
+- $\sigma(x)$ = risco da carteira (desvio padrão)
+
+#### 🔄 Ciclos Evolutivos
+
+A cada geração, o algoritmo executa:
+
+1. *Seleção* — Carteiras com melhor índice de Sharpe são escolhidas.
+2. *Cruzamento* — Combina carteiras para formar novas soluções.
+3. *Mutação* — Adiciona variações aleatórias para explorar melhor o espaço de soluções.
+
+## 📈 Resultados
+
+Ao fim da execução, o script apresenta:
+
+- A alocação ideal por FII.
+- Gráficos que mostram o desempenho ao longo das gerações.
+- Métricas financeiras da carteira ótima.
+
+## 🚀 Como Executar
+
+1. Clone o repositório:
+   ```bash
+   git clone https://github.com/rafaeljordaojardim/Tech-Challenge.git
